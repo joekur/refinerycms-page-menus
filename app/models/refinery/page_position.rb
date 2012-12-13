@@ -5,7 +5,7 @@ module Refinery
                     :title_attribute, :custom_url, :label
     
     belongs_to :menu, :class_name => '::Refinery::PageMenu', :foreign_key => :refinery_menu_id
-    belongs_to :page, :class_name => '::Refinery::Page', :foreign_key => :refinery_page_id
+    belongs_to :resource, :foreign_key => :refinery_resource_id, :polymorphic => true
 
     # Docs for acts_as_nested_set https://github.com/collectiveidea/awesome_nested_set
     # rather than :delete_all we want :destroy
@@ -42,6 +42,10 @@ module Refinery
     def resource_type
       refinery_resource_type || 'refinery_page'
     end
+    
+    def type_name
+      custom_link? ? "Custom link" : refinery_resource_type.titleize()
+    end
 
     def custom_link?
       refinery_resource_id.nil? || refinery_resource_type.nil?
@@ -52,13 +56,12 @@ module Refinery
     end
 
     def resource
-      return page if refinery_page_id # for now, until we phase out 'refinery_page_id'
       return nil if custom_link?
       resource_klass.find(refinery_resource_id)
     end
 
     def resource_url
-      resource || '/'
+      resource.present? ? resource.url : '/'
     end
 
     def resource_title
@@ -66,31 +69,15 @@ module Refinery
     end
 
     def title
-      page.title
+      title_attribute.present? ? title_attribute : label
     end
         
     def url
-      if refinery_page_id.present?
-        page.url
+      if custom_link?
+        custom_url
       else
-        if custom_link?
-          custom_url
-        else
-          resource_url
-        end
+        resource_url
       end
-    end
-    
-    def url=(value)
-      page.url = value
-    end
-    
-    def original_id
-      page.id
-    end
-    
-    def original_type
-      page.type
     end
 
     def as_json(options={})
@@ -103,6 +90,20 @@ module Refinery
         }.merge(json)
       end
       json
+    end
+
+    def to_refinery_menu_item
+      {
+        :id => id,
+        :lft => lft,
+        :menu_match => menu_match,
+        :parent_id => parent_id,
+        :rgt => rgt,
+        :title => title,
+        :type => resource_type,
+        # :type => self.class.name,
+        :url => url
+      }
     end
     
   end
